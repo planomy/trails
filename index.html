@@ -1,338 +1,364 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Send, Trophy, MousePointer2, Lock, Eye, HelpCircle, Sun, Moon, Timer } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRAILS - Snake Chain</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .snake-path { transition: all 0.5s ease; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-/**
- * TRAILS: THE SNAKE CHAIN
- * 1. Solid Orange Path strictly aligned to cell centers.
- * 2. Reverted Letter Bank to Indigo/Slate theme.
- * 3. Condensed UI: No labels, no counters.
- * 4. Mystery Puzzle: 21 Letters.
- * 5. Competitive Logic: Timer + 15s Check Penalty.
- */
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
 
-const GRID_WIDTH = 8;
-const CHECK_PENALTY = 15;
-const CELL_SIZE = 42; 
-const GAP_X = 6;  
-const GAP_Y = 48; 
+        // --- CONFIG ---
+        const GRID_WIDTH = 8;
+        const CHECK_PENALTY = 15;
+        const CELL_SIZE = 42; 
+        const GAP_X = 6;  
+        const GAP_Y = 48; 
 
-const DAILY_CONFIG = {
-  // Chain: CHERRY (Y) -> YELLOW (W) -> WINTER (R) -> REPORT
-  // C-H-E-R-R-Y-E-L-L-O-W-I-N-T-E-R-E-P-O-R-T
-  solution: "CHERRYELLOWINTEREPORT",
-  words: [
-    { category: "FRUIT" },
-    { category: "COLOR" },
-    { category: "SEASON" },
-    { category: "MEDIA" }
-  ],
-  hingeIndices: [5, 10, 15], 
-  anchors: [0, 20] 
-};
+        const DAILY_CONFIG = {
+            solution: "CHERRYELLOWINTEREPORT",
+            words: [
+                { category: "FRUIT" },
+                { category: "COLOR" },
+                { category: "SEASON" },
+                { category: "MEDIA" }
+            ],
+            hingeIndices: [5, 10, 15], 
+            anchors: [0, 20] 
+        };
 
-const SOLUTION_STR = DAILY_CONFIG.solution;
+        const SOLUTION_STR = DAILY_CONFIG.solution;
 
-const App = () => {
-  const [grid, setGrid] = useState([]);
-  const [bank, setBank] = useState([]);
-  const [selectedBankIdx, setSelectedBankIdx] = useState(null);
-  const [isGameOver, setIsGameOver] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [personalMessage, setPersonalMessage] = useState("");
-  const [selectedEmoji, setSelectedEmoji] = useState("👋");
-  const [showValidation, setShowValidation] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  
-  const [seconds, setSeconds] = useState(0);
-  const [isActive, setIsActive] = useState(false);
-  const [checkCount, setCheckCount] = useState(0);
-  const timerRef = useRef(null);
+        // --- ICONS ---
+        const SunIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>;
+        const MoonIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
+        const TimerIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="12" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>;
+        const EyeIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>;
+        const LockIcon = () => <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+        const TrophyIcon = () => <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
+        const SendIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>;
 
-  // --- COORDINATE MAPPING ---
-  const pathNodes = useMemo(() => {
-    let nodes = [];
-    let r = 0;
-    let c = 0;
-    let dir = 1; 
-
-    for (let i = 0; i < SOLUTION_STR.length; i++) {
-      nodes.push({ r, c, index: i });
-      if (dir === 1) {
-        if (c < GRID_WIDTH - 1) c++;
-        else { r++; dir = -1; }
-      } else {
-        if (c > 0) c--;
-        else { r++; dir = 1; }
-      }
-    }
-    return nodes;
-  }, []);
-
-  const svgPathD = useMemo(() => {
-    return pathNodes.reduce((acc, node, i) => {
-      const x = node.c * (CELL_SIZE + GAP_X) + CELL_SIZE / 2;
-      const y = node.r * (CELL_SIZE + GAP_Y) + CELL_SIZE / 2;
-      return acc + (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
-    }, "");
-  }, [pathNodes]);
-
-  // --- TIMER ---
-  useEffect(() => {
-    if (isActive && !isGameOver) {
-      timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
-    } else {
-      clearInterval(timerRef.current);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [isActive, isGameOver]);
-
-  const formatTime = (t) => {
-    const m = Math.floor(t / 60);
-    const s = t % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // --- INIT ---
-  useEffect(() => {
-    const initialGrid = SOLUTION_STR.split("").map((char, i) => {
-      if (DAILY_CONFIG.anchors.includes(i)) return char;
-      return null;
-    });
-    setGrid(initialGrid);
-
-    const interiorLetters = SOLUTION_STR.split("").filter((_, i) => !DAILY_CONFIG.anchors.includes(i));
-    setBank(interiorLetters.sort(() => Math.random() - 0.5).map((char, id) => ({ char, id, used: false })));
-  }, []);
-
-  // --- INTERACTIONS ---
-  const handleBankClick = (idx) => {
-    if (isGameOver || bank[idx].used) return;
-    setSelectedBankIdx(idx === selectedBankIdx ? null : idx);
-  };
-
-  const handleGridClick = (idx) => {
-    if (isGameOver || DAILY_CONFIG.anchors.includes(idx)) return;
-    if (!isActive) setIsActive(true);
-
-    const newGrid = [...grid];
-    const newBank = [...bank];
-
-    if (selectedBankIdx !== null && newGrid[idx] === null) {
-      newGrid[idx] = newBank[selectedBankIdx].char;
-      newBank[selectedBankIdx].used = true;
-      setGrid(newGrid);
-      setBank(newBank);
-      setSelectedBankIdx(null);
-      setShowValidation(false); 
-    } else if (newGrid[idx] !== null) {
-      const charToRemove = newGrid[idx];
-      const bankItem = newBank.find(b => b.char === charToRemove && b.used);
-      if (bankItem) bankItem.used = false;
-      newGrid[idx] = null;
-      setGrid(newGrid);
-      setBank(newBank);
-      setShowValidation(false);
-    }
-  };
-
-  const score = grid.filter((char, i) => char === SOLUTION_STR[i]).length;
-  const isComplete = grid.every(char => char !== null);
-
-  const copyToClipboard = () => {
-    const visual = grid.map((char, i) => {
-        if (DAILY_CONFIG.anchors.includes(i)) return "🟦";
-        return char === SOLUTION_STR[i] ? "🟩" : "⬜";
-    }).join("");
-
-    const text = `You have mail 📩\n${selectedEmoji} ${personalMessage}\n\n⏱ Time: ${formatTime(seconds)}\n🔍 Checks: ${checkCount}\n✅ Accuracy: ${score}/21\n\n${visual}\n\nPlay TRAILS at https://planomy.github.io/trails`;
-    const el = document.createElement('textarea');
-    el.value = text;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-
-    const btn = document.getElementById('share-btn');
-    if (btn) btn.innerText = "COPIED!";
-    setTimeout(() => { if (btn) btn.innerText = "SHARE RESULTS"; }, 2000);
-  };
-
-  return (
-    <div className={`min-h-screen transition-colors duration-500 font-sans p-4 pb-8 flex flex-col items-center select-none overflow-x-hidden ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
-      
-      {/* Header */}
-      <header className="w-full max-w-md flex justify-between items-center mb-6 px-2">
-        <h1 className="text-4xl font-black tracking-tighter text-orange-500 italic leading-none">TRAILS</h1>
-        <div className="flex items-center gap-2">
-            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-xl border-2 transition-all ${darkMode ? 'border-slate-800 bg-slate-900 text-orange-400' : 'border-slate-200 bg-white text-slate-400'}`}>
-                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} px-3 py-2 rounded-2xl shadow-sm border-2 flex items-center gap-2 min-w-[90px] justify-center`}>
-                <Timer size={16} className="text-orange-500" />
-                <div className={`text-lg font-black font-mono ${darkMode ? 'text-orange-400' : 'text-slate-700'}`}>
-                    {formatTime(seconds)}
-                </div>
-            </div>
-        </div>
-      </header>
-
-      {/* Categories */}
-      <div className={`w-full max-w-md p-3 rounded-2xl shadow-sm border mb-8 transition-colors ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-        <div className="flex flex-wrap gap-2 justify-center">
-            {DAILY_CONFIG.words.map((w, i) => (
-                <span key={i} className={`px-2.5 py-1 rounded-lg text-[10px] font-black border uppercase italic ${darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
-                    {w.category}
-                </span>
-            ))}
-        </div>
-      </div>
-
-      {/* THE SNAKE PATH GRID */}
-      <div 
-        className="relative mb-10"
-        style={{ 
-          width: GRID_WIDTH * CELL_SIZE + (GRID_WIDTH - 1) * GAP_X,
-          height: 3 * CELL_SIZE + 2 * GAP_Y 
-        }}
-      >
-        {/* SVG Solid Orange Path - Behind Tiles */}
-        <svg className="absolute inset-0 z-0 pointer-events-none overflow-visible">
-            <path 
-                d={svgPathD}
-                fill="transparent" 
-                stroke="#f97316" 
-                strokeWidth="4" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-                className={darkMode ? "opacity-60" : "opacity-40"}
-            />
-        </svg>
-
-        {/* The Grid */}
-        <div className="relative z-10 flex flex-col" style={{ gap: GAP_Y }}>
-          {[0, 1, 2].map(rIdx => (
-            <div key={rIdx} className="flex" style={{ gap: GAP_X }}>
-              {Array.from({ length: 8 }).map((_, cIdx) => {
-                const node = pathNodes.find(n => n.r === rIdx && n.c === cIdx);
-                if (!node) return <div key={cIdx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
-
-                const idx = node.index;
-                const char = grid[idx];
-                const isAnchor = DAILY_CONFIG.anchors.includes(idx);
-                const isHinge = DAILY_CONFIG.hingeIndices.includes(idx);
-                const isCorrect = char === SOLUTION_STR[idx];
-
-                return (
-                  <button
-                    key={cIdx}
-                    onClick={() => handleGridClick(idx)}
-                    style={{ width: CELL_SIZE, height: CELL_SIZE }}
-                    className={`
-                      flex items-center justify-center text-lg font-black rounded-xl
-                      transition-all duration-300 transform relative
-                      ${isAnchor ? 'bg-blue-600 text-white' : 
-                        (showValidation || isGameOver) && isCorrect ? 'bg-emerald-500 text-white scale-105' :
-                        (showValidation || isGameOver) && !isCorrect && char ? 'bg-rose-500 text-white' :
-                        char ? (darkMode ? 'bg-slate-800 text-indigo-400 border-2 border-slate-700' : 'bg-white border-2 border-indigo-200 text-indigo-700') :
-                        (darkMode ? 'bg-slate-900 border-2 border-slate-800 text-slate-700' : 'bg-white border-2 border-slate-100 text-slate-200')}
-                      ${isHinge ? (darkMode ? 'ring-[3px] ring-white z-20' : 'ring-[3px] ring-slate-800 z-20') : ''}
-                    `}
-                  >
-                    {char}
-                    {isAnchor && <div className="absolute top-0.5 left-0.5 opacity-20"><Lock size={8}/></div>}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mb-8">
-          <button 
-              onClick={() => { setCheckCount(c => c + 1); setSeconds(s => s + CHECK_PENALTY); setShowValidation(true); }}
-              className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors py-2 px-6 rounded-full border ${darkMode ? 'bg-slate-900 text-slate-500 border-slate-800 hover:text-orange-400' : 'bg-white text-slate-400 border-slate-200 hover:text-indigo-600'}`}
-          >
-              <Eye size={14}/> Check Trail <span className="opacity-50">(+{CHECK_PENALTY}s)</span>
-          </button>
-      </div>
-
-      {/* Letter Bank - Reverted to Indigo Scheme */}
-      {!isGameOver && (
-        <div className={`w-full max-w-md p-3 rounded-[2rem] shadow-xl border-b-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-950' : 'bg-white border-slate-200'}`}>
-          <div className="grid grid-cols-7 gap-1 mb-3">
-            {bank.map((item, i) => (
-              <button
-                key={item.id}
-                disabled={item.used}
-                onClick={() => handleBankClick(i)}
-                className={`
-                  aspect-square flex items-center justify-center rounded-lg font-black text-lg transition-all
-                  ${item.used ? 'scale-75 opacity-0 pointer-events-none' : 
-                    selectedBankIdx === i ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 scale-110 z-20' : 
-                    (darkMode ? 'bg-slate-800 text-indigo-400 border-2 border-slate-700' : 'bg-indigo-50 text-indigo-700 border-2 border-indigo-100')}
-                `}
-              >
-                {item.char}
-              </button>
-            ))}
-          </div>
-
-          <button 
-            onClick={() => { if (isComplete) { setIsGameOver(true); setShowShareModal(true); } }}
-            className={`w-full font-black py-4 rounded-xl text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2
-              ${isComplete ? 'bg-indigo-600 text-white hover:bg-indigo-700' : (darkMode ? 'bg-slate-800 text-slate-700' : 'bg-slate-200 text-slate-400') + ' pointer-events-none'}
-            `}
-          >
-            <Send size={18}/> LOCK & MAIL
-          </button>
-        </div>
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className={`${darkMode ? 'bg-slate-900 border border-slate-800' : 'bg-white'} w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300`}>
-            <div className="bg-indigo-600 p-8 text-white text-center">
-              <Trophy className="mx-auto mb-2 text-white" size={44} />
-              <h2 className="text-3xl font-black tracking-tight uppercase italic leading-none">Trail Solved!</h2>
-            </div>
+        const App = () => {
+            const [grid, setGrid] = useState([]);
+            const [bank, setBank] = useState([]);
+            const [selectedBankIdx, setSelectedBankIdx] = useState(null);
+            const [isGameOver, setIsGameOver] = useState(false);
+            const [showShareModal, setShowShareModal] = useState(false);
+            const [personalMessage, setPersonalMessage] = useState("");
+            const [selectedEmoji, setSelectedEmoji] = useState("👋");
+            const [showValidation, setShowValidation] = useState(false);
+            const [darkMode, setDarkMode] = useState(false);
             
-            <div className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                  <div className={`p-3 rounded-2xl border-2 text-center ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-100 bg-slate-50'}`}>
-                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Time</p>
-                      <p className="text-xl font-black text-orange-500">{formatTime(seconds)}</p>
-                  </div>
-                  <div className={`p-3 rounded-2xl border-2 text-center ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-100 bg-slate-50'}`}>
-                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Penalties</p>
-                      <p className="text-xl font-black text-orange-500">{checkCount}</p>
-                  </div>
-              </div>
+            const [seconds, setSeconds] = useState(0);
+            const [isActive, setIsActive] = useState(false);
+            const [checkCount, setCheckCount] = useState(0);
+            const timerRef = useRef(null);
 
-              <textarea 
-                placeholder="Type a message..."
-                value={personalMessage}
-                onChange={(e) => setPersonalMessage(e.target.value)}
-                className={`w-full p-4 border-2 rounded-2xl font-bold outline-none h-20 resize-none text-sm shadow-inner transition-colors ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-100 text-slate-900'}`}
-              />
+            // --- PATH LOGIC ---
+            const pathNodes = useMemo(() => {
+                let nodes = [];
+                let r = 0, c = 0, dir = 1; 
+                for (let i = 0; i < SOLUTION_STR.length; i++) {
+                    nodes.push({ r, c, index: i });
+                    if (dir === 1) {
+                        if (c < GRID_WIDTH - 1) c++;
+                        else { r++; dir = -1; }
+                    } else {
+                        if (c > 0) c--;
+                        else { r++; dir = 1; }
+                    }
+                }
+                return nodes;
+            }, []);
 
-              <div className={`flex justify-between p-2 rounded-2xl border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-indigo-50 border-indigo-100'}`}>
-                {["👋", "🔥", "☕", "🤔", "💪", "🏆"].map(e => (
-                  <button key={e} onClick={() => setSelectedEmoji(e)} className={`text-2xl p-1 rounded-xl transition-all ${selectedEmoji === e ? (darkMode ? 'bg-slate-800 shadow-md' : 'bg-white shadow-md') + ' scale-110' : 'opacity-40 hover:opacity-100'}`}>{e}</button>
-                ))}
-              </div>
+            const svgPathD = useMemo(() => {
+                return pathNodes.reduce((acc, node, i) => {
+                    const x = node.c * (CELL_SIZE + GAP_X) + CELL_SIZE / 2;
+                    const y = node.r * (CELL_SIZE + GAP_Y) + CELL_SIZE / 2;
+                    return acc + (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
+                }, "");
+            }, [pathNodes]);
 
-              <button id="share-btn" onClick={copyToClipboard} className="w-full bg-indigo-600 text-white font-black py-5 rounded-[1.5rem] shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
-                <Send size={20} /> SHARE RESULTS
-              </button>
-              <button onClick={() => setShowShareModal(false)} className="w-full text-slate-400 font-black py-2 text-sm uppercase tracking-widest text-center mt-2">Back</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+            // --- TIMER ---
+            useEffect(() => {
+                if (isActive && !isGameOver) {
+                    timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
+                } else {
+                    clearInterval(timerRef.current);
+                }
+                return () => clearInterval(timerRef.current);
+            }, [isActive, isGameOver]);
 
-export default App;
+            const formatTime = (t) => {
+                const m = Math.floor(t / 60);
+                const s = t % 60;
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            };
+
+            // --- INIT ---
+            useEffect(() => {
+                const initialGrid = SOLUTION_STR.split("").map((char, i) => {
+                    if (DAILY_CONFIG.anchors.includes(i)) return char;
+                    return null;
+                });
+                setGrid(initialGrid);
+
+                const interiorLetters = SOLUTION_STR.split("").filter((_, i) => !DAILY_CONFIG.anchors.includes(i));
+                setBank(interiorLetters.sort(() => Math.random() - 0.5).map((char, id) => ({ char, id, used: false })));
+            }, []);
+
+            // --- INTERACTIONS ---
+            const handleBankClick = (idx) => {
+                if (isGameOver || bank[idx].used) return;
+                setSelectedBankIdx(idx === selectedBankIdx ? null : idx);
+            };
+
+            const handleGridClick = (idx) => {
+                if (isGameOver || DAILY_CONFIG.anchors.includes(idx)) return;
+                if (!isActive) setIsActive(true);
+
+                const newGrid = [...grid];
+                const newBank = [...bank];
+
+                if (selectedBankIdx !== null && newGrid[idx] === null) {
+                    newGrid[idx] = newBank[selectedBankIdx].char;
+                    newBank[selectedBankIdx].used = true;
+                    setGrid(newGrid);
+                    setBank(newBank);
+                    setSelectedBankIdx(null);
+                    setShowValidation(false); 
+                } else if (newGrid[idx] !== null) {
+                    const charToRemove = newGrid[idx];
+                    const bankItem = newBank.find(b => b.char === charToRemove && b.used);
+                    if (bankItem) bankItem.used = false;
+                    newGrid[idx] = null;
+                    setGrid(newGrid);
+                    setBank(newBank);
+                    setShowValidation(false);
+                }
+            };
+
+            const handleCheck = () => {
+                setCheckCount(c => c + 1);
+                setSeconds(s => s + CHECK_PENALTY);
+                setShowValidation(true);
+            };
+
+            const score = grid.filter((char, i) => char === SOLUTION_STR[i]).length;
+            const isComplete = grid.every(char => char !== null);
+
+            const copyToClipboard = () => {
+                const visual = grid.map((char, i) => {
+                    if (DAILY_CONFIG.anchors.includes(i)) return "🟦";
+                    return char === SOLUTION_STR[i] ? "🟩" : "⬜";
+                }).join("");
+
+                const text = `You have mail 📩\n${selectedEmoji} ${personalMessage}\n\n⏱ Time: ${formatTime(seconds)}\n🔍 Checks: ${checkCount}\n✅ Accuracy: ${score}/21\n\n${visual}\n\nPlay TRAILS at https://planomy.github.io/trails`;
+                
+                const el = document.createElement('textarea');
+                el.value = text;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+
+                const btn = document.getElementById('share-btn');
+                if (btn) btn.innerText = "COPIED!";
+                setTimeout(() => { if (btn) btn.innerText = "SHARE RESULTS"; }, 2000);
+            };
+
+            return (
+                <div className={`min-h-screen transition-colors duration-500 font-sans p-4 pb-8 flex flex-col items-center select-none overflow-x-hidden ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+                    
+                    {/* Header */}
+                    <header className="w-full max-w-md flex justify-between items-center mb-6 px-2">
+                        <h1 className="text-4xl font-black tracking-tighter text-orange-500 italic leading-none">TRAILS</h1>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-xl border-2 transition-all ${darkMode ? 'border-slate-800 bg-slate-900 text-orange-400' : 'border-slate-200 bg-white text-slate-400'}`}>
+                                {darkMode ? <SunIcon /> : <MoonIcon />}
+                            </button>
+                            <div className={`${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} px-3 py-2 rounded-2xl shadow-sm border-2 flex items-center gap-2 min-w-[90px] justify-center`}>
+                                <TimerIcon />
+                                <div className={`text-lg font-black font-mono ${darkMode ? 'text-orange-400' : 'text-slate-700'}`}>
+                                    {formatTime(seconds)}
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Categories */}
+                    <div className={`w-full max-w-md p-3 rounded-2xl shadow-sm border mb-8 transition-colors ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                            {DAILY_CONFIG.words.map((w, i) => (
+                                <span key={i} className={`px-2.5 py-1 rounded-lg text-[10px] font-black border uppercase italic ${darkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                                    {w.category}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* THE SNAKE PATH GRID */}
+                    <div 
+                        className="relative mb-10"
+                        style={{ 
+                            width: GRID_WIDTH * CELL_SIZE + (GRID_WIDTH - 1) * GAP_X,
+                            height: 3 * CELL_SIZE + 2 * GAP_Y 
+                        }}
+                    >
+                        {/* SVG Solid Orange Path - BEHIND TILES */}
+                        <svg className="absolute inset-0 z-0 pointer-events-none overflow-visible">
+                            <path 
+                                d={svgPathD}
+                                fill="transparent" 
+                                stroke="#f97316" 
+                                strokeWidth="4" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                                className={darkMode ? "opacity-60" : "opacity-40"}
+                            />
+                        </svg>
+
+                        {/* The Grid */}
+                        <div className="relative z-10 flex flex-col" style={{ gap: GAP_Y }}>
+                            {[0, 1, 2].map(rIdx => (
+                                <div key={rIdx} className="flex" style={{ gap: GAP_X }}>
+                                    {Array.from({ length: 8 }).map((_, cIdx) => {
+                                        const node = pathNodes.find(n => n.r === rIdx && n.c === cIdx);
+                                        if (!node) return <div key={cIdx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+
+                                        const idx = node.index;
+                                        const char = grid[idx];
+                                        const isAnchor = DAILY_CONFIG.anchors.includes(idx);
+                                        const isHinge = DAILY_CONFIG.hingeIndices.includes(idx);
+                                        const isCorrect = char === SOLUTION_STR[idx];
+
+                                        return (
+                                            <button
+                                                key={cIdx}
+                                                onClick={() => handleGridClick(idx)}
+                                                style={{ width: CELL_SIZE, height: CELL_SIZE }}
+                                                className={`
+                                                    flex items-center justify-center text-lg font-black rounded-xl
+                                                    transition-all duration-300 transform relative
+                                                    ${isAnchor ? 'bg-blue-600 text-white' : 
+                                                        (showValidation || isGameOver) && isCorrect ? 'bg-emerald-500 text-white scale-105' :
+                                                        (showValidation || isGameOver) && !isCorrect && char ? 'bg-rose-500 text-white' :
+                                                        char ? (darkMode ? 'bg-slate-800 text-indigo-400 border-2 border-slate-700' : 'bg-white border-2 border-indigo-200 text-indigo-700') :
+                                                        (darkMode ? 'bg-slate-900 border-2 border-slate-800 text-slate-700' : 'bg-white border-2 border-slate-100 text-slate-200')}
+                                                    ${isHinge ? (darkMode ? 'ring-[3px] ring-white z-20' : 'ring-[3px] ring-slate-800 z-20') : ''}
+                                                `}
+                                            >
+                                                {char}
+                                                {isAnchor && <div className="absolute top-0.5 left-0.5 opacity-20"><LockIcon /></div>}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mb-8">
+                        <button 
+                            onClick={handleCheck}
+                            className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors py-2 px-6 rounded-full border ${darkMode ? 'bg-slate-900 text-slate-500 border-slate-800 hover:text-orange-400' : 'bg-white text-slate-400 border-slate-200 hover:text-indigo-600'}`}
+                        >
+                            <EyeIcon /> Check Trail <span className="opacity-50">(+{CHECK_PENALTY}s)</span>
+                        </button>
+                    </div>
+
+                    {/* Letter Bank - Reverted to Indigo Scheme */}
+                    {!isGameOver && (
+                        <div className={`w-full max-w-md p-3 rounded-[2rem] shadow-xl border-b-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-950' : 'bg-white border-slate-200'}`}>
+                            <div className="grid grid-cols-7 gap-1 mb-3">
+                                {bank.map((item, i) => (
+                                    <button
+                                        key={item.id}
+                                        disabled={item.used}
+                                        onClick={() => handleBankClick(i)}
+                                        className={`
+                                            aspect-square flex items-center justify-center rounded-lg font-black text-lg transition-all
+                                            ${item.used ? 'scale-75 opacity-0 pointer-events-none' : 
+                                                selectedBankIdx === i ? 'bg-indigo-600 text-white ring-4 ring-indigo-100 scale-110 z-20' : 
+                                                (darkMode ? 'bg-slate-800 text-indigo-400 border-2 border-slate-700' : 'bg-indigo-50 text-indigo-700 border-2 border-indigo-100')}
+                                        `}
+                                    >
+                                        {item.char}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <button 
+                                onClick={() => { if (isComplete) { setIsGameOver(true); setShowShareModal(true); } }}
+                                className={`w-full font-black py-4 rounded-xl text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2
+                                    ${isComplete ? 'bg-indigo-600 text-white hover:bg-indigo-700' : (darkMode ? 'bg-slate-800 text-slate-700' : 'bg-slate-200 text-slate-400') + ' pointer-events-none'}
+                                `}
+                            >
+                                <SendIcon /> LOCK & MAIL
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Share Modal */}
+                    {showShareModal && (
+                        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+                            <div className={`${darkMode ? 'bg-slate-900 border border-slate-800' : 'bg-white'} w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300`}>
+                                <div className="bg-indigo-600 p-8 text-white text-center">
+                                    <TrophyIcon />
+                                    <h2 className="text-3xl font-black tracking-tight uppercase italic leading-none mt-2">Trail Solved!</h2>
+                                </div>
+                                
+                                <div className="p-8 space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                            <div className={`p-3 rounded-2xl border-2 text-center ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-100 bg-slate-50'}`}>
+                                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Time</p>
+                                                    <p className="text-xl font-black text-indigo-500">{formatTime(seconds)}</p>
+                                            </div>
+                                            <div className={`p-3 rounded-2xl border-2 text-center ${darkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-100 bg-slate-50'}`}>
+                                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Penalties</p>
+                                                    <p className="text-xl font-black text-orange-500">{checkCount}</p>
+                                            </div>
+                                    </div>
+
+                                    <textarea 
+                                        placeholder="Type a message..."
+                                        value={personalMessage}
+                                        onChange={(e) => setPersonalMessage(e.target.value)}
+                                        className={`w-full p-4 border-2 rounded-2xl font-bold outline-none h-20 resize-none text-sm shadow-inner transition-colors ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-100 text-slate-900'}`}
+                                    />
+
+                                    <div className={`flex justify-between p-2 rounded-2xl border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-indigo-50 border-indigo-100'}`}>
+                                        {["👋", "🔥", "☕", "🤔", "💪", "🏆"].map(e => (
+                                            <button key={e} onClick={() => setSelectedEmoji(e)} className={`text-2xl p-1 rounded-xl transition-all ${selectedEmoji === e ? (darkMode ? 'bg-slate-800 shadow-md' : 'bg-white shadow-md') + ' scale-110' : 'opacity-40 hover:opacity-100'}`}>{e}</button>
+                                        ))}
+                                    </div>
+
+                                    <button id="share-btn" onClick={copyToClipboard} className="w-full bg-indigo-600 text-white font-black py-5 rounded-[1.5rem] shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
+                                        <SendIcon /> SHARE RESULTS
+                                    </button>
+                                    <button onClick={() => setShowShareModal(false)} className="w-full text-slate-500 font-black py-2 text-sm uppercase tracking-widest text-center mt-2">Back</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
