@@ -20,6 +20,11 @@
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Ensure the path line is sharp on mobile */
+        path {
+            vector-effect: non-scaling-stroke;
+        }
     </style>
 </head>
 <body class="bg-[#020617]">
@@ -30,7 +35,6 @@
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- INLINE ICONS ---
-        // Replaces external lucide-react dependency to prevent UMD script execution errors
         const Icon = ({ name, size = 24, strokeWidth = 2, className = "", stroke = "currentColor", fill = "none" }) => {
             const paths = {
                 send: <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>,
@@ -99,7 +103,6 @@
           [{category: "CRIME", word: "CARTEL"}, {category: "BODY", word: "LUNG"}, {category: "VICE", "word": "GOSSIP"}, {category: "BARRIER", word: "PICKET"}, {category: "CURRENCY", word: "TOKEN"}]
         ];
 
-        // --- MASTER CONFIG & GAME LOGIC ---
         const GRID_WIDTH = 8;
         const CHECK_PENALTY = 15;
         const HINT_PENALTIES = [15, 20, 30];
@@ -107,38 +110,32 @@
         const GAP_X = 5;      
         const GAP_Y = 22; 
 
-        // Dynamic puzzle builder 
         const buildPuzzle = (wordList, puzzleNumber) => {
           let solution = wordList[0].word;
           let hingeIndices = [];
           let words = [{ category: wordList[0].category }];
-
           for (let i = 1; i < wordList.length; i++) {
               const currentWord = wordList[i].word;
               words.push({ category: wordList[i].category });
               hingeIndices.push(solution.length - 1);
               solution += currentWord.slice(1);
           }
-
           return { solution, words, hingeIndices, anchors: [0, solution.length - 1], puzzleNumber };
         };
 
-        // Calculate Local Time Day ID
         const getLocalDayDiff = () => {
           const now = new Date();
           const localEpoch = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-          const gameEpoch = Date.UTC(2026, 1, 27); // Launch Date: Feb 27, 2026
+          const gameEpoch = Date.UTC(2026, 1, 27); 
           let dayDiff = Math.floor((localEpoch - gameEpoch) / (1000 * 60 * 60 * 24));
           return dayDiff >= 0 ? dayDiff : 0;
         };
 
-        // Note: the +1 is kept for testing purposes as you requested earlier. Remove it for launch!
-        const dayDiff = getLocalDayDiff() + 1;
+        const dayDiff = getLocalDayDiff() + 1; // +1 for testing as requested
         const puzzleIndex = dayDiff % PUZZLE_BANK.length;
         const DAILY_CONFIG = buildPuzzle(PUZZLE_BANK[puzzleIndex], dayDiff + 1);
         const SOLUTION_STR = DAILY_CONFIG.solution;
 
-        // Metagame Logic: Ranks
         const getRankInfo = (xp) => {
             const ranks = [
                 { name: "Novice", xp: 0 },
@@ -174,13 +171,12 @@
           const [isPB, setIsPB] = useState(false);
           const [hintedIndices, setHintedIndices] = useState([]);
           
-          // Metagame States
           const [sessionXP, setSessionXP] = useState(0);
           const [userStats, setUserStats] = useState({ totalXP: 0, currentStreak: 0, maxStreak: 0, lastPlayedDayId: -1 });
 
           const [seconds, setSeconds] = useState(0);
-          const [displaySeconds, setDisplaySeconds] = useState(0); // Animation state for time
-          const [barWidth, setBarWidth] = useState(0); // Animation state for progress bar
+          const [displaySeconds, setDisplaySeconds] = useState(0); 
+          const [barWidth, setBarWidth] = useState(0); 
           const [isActive, setIsActive] = useState(false);
           const [checkCount, setCheckCount] = useState(0);
           const [hintCount, setHintCount] = useState(0);
@@ -219,28 +215,21 @@
             return () => clearInterval(timerRef.current);
           }, [isActive, isGameOver]);
 
-          // --- ANIMATION EFFECTS FOR SHARE MODAL ---
           useEffect(() => {
             if (showShareModal) {
                 const timeoutId = setTimeout(() => {
                     setBarWidth(getRankInfo(userStats.totalXP).progress);
                 }, 300);
-
                 let startTimestamp = null;
                 const duration = 1500; 
                 const step = (timestamp) => {
                     if (!startTimestamp) startTimestamp = timestamp;
                     const progress = Math.min((timestamp - startTimestamp) / duration, 1);
                     const easeOutCubic = 1 - Math.pow(1 - progress, 3);
-                    
                     setDisplaySeconds(Math.floor(easeOutCubic * seconds));
-                    
-                    if (progress < 1) {
-                        window.requestAnimationFrame(step);
-                    }
+                    if (progress < 1) window.requestAnimationFrame(step);
                 };
                 window.requestAnimationFrame(step);
-
                 return () => clearTimeout(timeoutId);
             } else {
                 setBarWidth(0);
@@ -260,10 +249,7 @@
               return null;
             });
             setGrid(initialGrid);
-            
-            const interiorLetters = SOLUTION_STR.split("").filter((_, i) => 
-              !DAILY_CONFIG.anchors.includes(i)
-            );
+            const interiorLetters = SOLUTION_STR.split("").filter((_, i) => !DAILY_CONFIG.anchors.includes(i));
             setBank(interiorLetters.sort(() => Math.random() - 0.5).map((char, id) => ({ char, id, used: false })));
           }, []);
 
@@ -305,24 +291,18 @@
 
           const handleHint = () => {
             if (isGameOver || hintCount >= 3) return;
-            
-            const hintTargetIndices = Array.from({ length: SOLUTION_STR.length }, (_, i) => i)
-                .filter(i => !DAILY_CONFIG.anchors.includes(i));
-                
+            const hintTargetIndices = Array.from({ length: SOLUTION_STR.length }, (_, i) => i).filter(i => !DAILY_CONFIG.anchors.includes(i));
             const hintIdx = hintTargetIndices.find(i => grid[i] !== SOLUTION_STR[i]);
-            
             if (hintIdx !== undefined) {
               const charToReveal = SOLUTION_STR[hintIdx];
               const penalty = HINT_PENALTIES[hintCount];
               const newGrid = [...grid];
               const newBank = [...bank];
-
               if (newGrid[hintIdx] !== null) {
                 const wrongChar = newGrid[hintIdx];
                 const returnIdx = newBank.findIndex(item => item.char === wrongChar && item.used);
                 if (returnIdx !== -1) newBank[returnIdx].used = false;
               }
-
               const bankItemIdx = newBank.findIndex(item => item.char === charToReveal && !item.used);
               if (bankItemIdx !== -1) {
                 newBank[bankItemIdx].used = true;
@@ -339,45 +319,28 @@
 
           const handleFinishGame = () => {
             if (!isComplete) return;
-            
             const savedPB = localStorage.getItem('trails_pb');
             if (!savedPB || seconds < parseInt(savedPB, 10)) {
                 localStorage.setItem('trails_pb', seconds.toString());
                 setIsPB(true);
-            } else {
-                setIsPB(false);
-            }
-
+            } else { setIsPB(false); }
             const savedData = localStorage.getItem('trails_save');
             const stats = savedData ? JSON.parse(savedData) : { totalXP: 0, currentStreak: 0, maxStreak: 0, lastPlayedDayId: -1 };
-            
             let earnedXP = 0;
             let newStreak = stats.currentStreak;
-
             if (stats.lastPlayedDayId !== dayDiff) {
                 const baseXP = 500;
                 const speedBonus = Math.max(0, Math.floor(300 * (1 - seconds / 300))); 
                 const flawlessBonus = (checkCount === 0 && hintCount === 0) ? 200 : 0;
                 const penalties = (checkCount * 50) + (hintCount * 100);
-                
                 earnedXP = Math.max(100, baseXP + speedBonus + flawlessBonus - penalties);
-
-                if (stats.lastPlayedDayId === dayDiff - 1) {
-                    newStreak += 1;
-                } else {
-                    newStreak = 1;
-                }
-
+                if (stats.lastPlayedDayId === dayDiff - 1) { newStreak += 1; } else { newStreak = 1; }
                 stats.totalXP += earnedXP;
                 stats.currentStreak = newStreak;
                 stats.maxStreak = Math.max(stats.maxStreak, newStreak);
                 stats.lastPlayedDayId = dayDiff;
-                
                 localStorage.setItem('trails_save', JSON.stringify(stats));
-            } else {
-                earnedXP = 0;
-            }
-
+            } else { earnedXP = 0; }
             setSessionXP(earnedXP);
             setUserStats(stats);
             setIsGameOver(true);
@@ -402,28 +365,19 @@
               visualRows.push(rowChars.join(""));
             }
             const visual = visualRows.join("\n");
-
             const rankInfo = getRankInfo(userStats.totalXP);
             const pbText = isPB ? " 👑 PB!" : "";
             const msgText = personalMessage.trim() ? `${selectedEmoji} ${personalMessage}\n` : "";
-            
             let statsHeader = `TRAILS #${DAILY_CONFIG.puzzleNumber}`;
-            if (userStats.currentStreak > 0) {
-                statsHeader += `\n🔥 ${userStats.currentStreak} Day Streak | 🛡️ Rank: ${rankInfo.currentRank.name}`;
-            }
-            if (sessionXP > 0) {
-                statsHeader += `\n✨ +${sessionXP} XP`;
-            }
-
+            if (userStats.currentStreak > 0) statsHeader += `\n🔥 ${userStats.currentStreak} Day Streak | 🛡️ Rank: ${rankInfo.currentRank.name}`;
+            if (sessionXP > 0) statsHeader += `\n✨ +${sessionXP} XP`;
             const text = `${statsHeader}\n${msgText}\n⏱ ${formatTime(seconds)}${pbText} | 🔍 ${checkCount} | 💡 ${hintCount} | ✅ ${score}/${SOLUTION_STR.length}\n\n${visual}\n\nhttps://planomy.github.io/trails`;
-            
             const el = document.createElement('textarea');
             el.value = text;
             document.body.appendChild(el);
             el.select();
             document.execCommand('copy');
             document.body.removeChild(el);
-
             const btn = document.getElementById('share-btn');
             if (btn) btn.innerText = "COPIED TO CLIPBOARD!";
             setTimeout(() => { if (btn) btn.innerText = "SHARE YOUR RESULTS"; }, 2000);
@@ -465,15 +419,16 @@
                     className="relative"
                     style={{ width: GRID_WIDTH * CELL_SIZE + (GRID_WIDTH - 1) * GAP_X }}
                 >
+                    {/* ENHANCED PATH LINE: Thicker and fully solid in Dark Mode */}
                     <svg className="absolute inset-0 z-0 pointer-events-none overflow-visible w-full h-full">
                         <path 
                             d={svgPathD}
                             fill="transparent" 
                             stroke="#F97316" 
-                            strokeWidth="3.5" 
+                            strokeWidth="4" 
                             strokeLinecap="round" 
                             strokeLinejoin="round"
-                            className={darkMode ? "opacity-80" : "opacity-40"}
+                            className={darkMode ? "opacity-100" : "opacity-60"}
                         />
                     </svg>
 
@@ -483,7 +438,6 @@
                                 {Array.from({ length: 8 }).map((_, cIdx) => {
                                     const node = pathNodes.find(n => n.r === rIdx && n.c === cIdx);
                                     if (!node) return <div key={cIdx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
-
                                     const idx = node.index;
                                     const char = grid[idx];
                                     const isAnchor = DAILY_CONFIG.anchors.includes(idx);
@@ -506,7 +460,7 @@
                                                     isHinge && !char ? (darkMode ? 'bg-slate-700 border-[3px] border-white shadow-inner' : 'bg-slate-200 border-[3px] border-slate-900 shadow-inner') :
                                                     isHinge && char ? (darkMode ? 'bg-slate-800 text-indigo-400 border-[3px] border-white shadow-xl' : 'bg-white border-[3px] border-slate-900 text-indigo-700 shadow-md') :
                                                     char ? (darkMode ? 'bg-slate-800 text-indigo-400 border-2 border-slate-600 shadow-xl' : 'bg-white border-2 border-slate-300 text-indigo-700 shadow-sm') :
-                                                    (darkMode ? 'bg-[#0f172a] border-2 border-slate-600 text-slate-700' : 'bg-white border-2 border-slate-300 text-slate-200')}
+                                                    (darkMode ? 'bg-[#0f172a] border-2 border-slate-500 text-slate-700' : 'bg-white border-2 border-slate-300 text-slate-200')}
                                             `}
                                         >
                                             {char}
@@ -552,34 +506,11 @@
               )}
 
               <div className="w-full flex justify-center gap-3 mt-4 mb-2 relative z-20">
-                  <button 
-                      onClick={handleHint}
-                      disabled={hintCount >= 3}
-                      className={`flex items-center gap-1.5 p-1 px-2.5 rounded-full border shadow-sm transition-all active:scale-95 ${hintCount >= 3 ? 'opacity-30 cursor-not-allowed' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-orange-400' : 'bg-white border-slate-200 text-slate-500 hover:text-indigo-600')}`}
-                  >
-                      <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px]">
-                          <Icon name="helpCircle" size={16} strokeWidth={2.5} /> HINT
-                      </div>
-                      <div className="flex gap-1 ml-1">
-                          {HINT_PENALTIES.map((penalty, i) => (
-                              <div 
-                                  key={i} 
-                                  className={`w-7 h-5 flex items-center justify-center text-[8px] font-black rounded-md transition-colors border
-                                      ${i < hintCount 
-                                          ? 'bg-rose-600 border-rose-700 text-white' 
-                                          : (darkMode ? 'bg-slate-800 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400')}
-                                  `}
-                              >
-                                  +{penalty}
-                              </div>
-                          ))}
-                      </div>
+                  <button onClick={handleHint} disabled={hintCount >= 3} className={`flex items-center gap-1.5 p-1 px-2.5 rounded-full border shadow-sm transition-all active:scale-95 ${hintCount >= 3 ? 'opacity-30 cursor-not-allowed' : (darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-orange-400' : 'bg-white border-slate-200 text-slate-500 hover:text-indigo-600')}`}>
+                      <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px]"><Icon name="helpCircle" size={16} strokeWidth={2.5} /> HINT</div>
+                      <div className="flex gap-1 ml-1">{HINT_PENALTIES.map((p, i) => (<div key={i} className={`w-7 h-5 flex items-center justify-center text-[8px] font-black rounded-md transition-colors border ${i < hintCount ? 'bg-rose-600 border-rose-700 text-white' : (darkMode ? 'bg-slate-800 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400')}`}>+{p}</div>))}</div>
                   </button>
-
-                  <button 
-                      onClick={handleCheck}
-                      className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider transition-all py-2.5 px-6 rounded-full border shadow-sm active:scale-95 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-800 hover:text-orange-400' : 'bg-white text-slate-500 border-slate-200 hover:text-indigo-600'}`}
-                  >
+                  <button onClick={handleCheck} className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider transition-all py-2.5 px-6 rounded-full border shadow-sm active:scale-95 ${darkMode ? 'bg-slate-900 text-slate-400 border-slate-800 hover:text-orange-400' : 'bg-white text-slate-500 border-slate-200 hover:text-indigo-600'}`}>
                       <Icon name="eye" size={16} strokeWidth={2.5} /> CHECK <span className="opacity-50 ml-0.5">+15s</span>
                   </button>
               </div>
@@ -587,72 +518,13 @@
               {showShareModal && (
                 <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
                     <div className={`${darkMode ? 'bg-[#0f172a] border border-slate-800' : 'bg-white'} w-full max-w-[340px] max-h-[95vh] rounded-[2.5rem] flex flex-col shadow-2xl animate-in zoom-in duration-300`}>
-                        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 text-white text-center relative shrink-0 rounded-t-[2.5rem]">
-                            <Icon name="trophy" className="mx-auto" size={40} strokeWidth={2} />
-                            <h2 className="text-2xl font-black tracking-tight uppercase italic leading-none mt-3">Trail Solved!</h2>
-                        </div>
-                        
+                        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 text-white text-center relative shrink-0 rounded-t-[2.5rem]"><Icon name="trophy" className="mx-auto" size={40} strokeWidth={2} /><h2 className="text-2xl font-black tracking-tight uppercase italic leading-none mt-3">Trail Solved!</h2></div>
                         <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
-                            <div className={`p-4 rounded-3xl border-2 ${darkMode ? 'border-slate-800 bg-slate-900/80' : 'border-indigo-100 bg-indigo-50/80'}`}>
-                                <div className="flex justify-between items-center mb-3">
-                                    <div className="flex items-center gap-1.5 text-orange-500 font-black text-[11px] uppercase tracking-wider">
-                                        <Icon name="flame" size={14} strokeWidth={3} /> {userStats.currentStreak > 0 ? `${userStats.currentStreak} Day Streak` : 'No Streak'}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-indigo-500 font-black text-[11px] uppercase tracking-wider">
-                                        <Icon name="shield" size={14} strokeWidth={3} /> {getRankInfo(userStats.totalXP).currentRank.name}
-                                    </div>
-                                </div>
-                                <div className={`w-full rounded-full h-2.5 mb-2 overflow-hidden ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
-                                    <div className="bg-gradient-to-r from-indigo-500 to-orange-500 h-full rounded-full transition-all duration-1000 ease-out" style={{width: `${barWidth}%`}}></div>
-                                </div>
-                                <div className="flex justify-between text-[9px] text-slate-500 font-black tracking-widest uppercase">
-                                    <span>{userStats.totalXP.toLocaleString()} XP</span>
-                                    <span>{getRankInfo(userStats.totalXP).nextRank.name} ({getRankInfo(userStats.totalXP).nextRank.xp.toLocaleString()})</span>
-                                </div>
-                                {sessionXP > 0 && (
-                                    <div className="text-center mt-3 text-xs font-black text-emerald-500 animate-pulse bg-emerald-500/10 py-1.5 rounded-lg flex items-center justify-center gap-1">
-                                        <Icon name="star" size={14} /> +{sessionXP} XP EARNED TODAY!
-                                    </div>
-                                )}
-                                {sessionXP === 0 && userStats.lastPlayedDayId === dayDiff && (
-                                     <div className="text-center mt-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                        XP Already claimed today
-                                     </div>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                    <div className={`p-3 rounded-2xl border-2 text-center relative ${darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50'}`}>
-                                            {isPB && (
-                                                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-amber-300 to-amber-500 text-amber-950 text-[9px] font-black px-3 py-0.5 rounded-full uppercase tracking-widest shadow-md flex items-center gap-1 whitespace-nowrap">
-                                                    <Icon name="crown" size={10} strokeWidth={3} /> NEW PB
-                                                </div>
-                                            )}
-                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">FINAL TIME</p>
-                                            <p className="text-xl font-black text-orange-500">{formatTime(displaySeconds)}</p>
-                                    </div>
-                                    <div className={`p-3 rounded-2xl border-2 text-center ${darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50'}`}>
-                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">CHECKS</p>
-                                            <p className="text-xl font-black text-orange-500">{checkCount}</p>
-                                    </div>
-                            </div>
-
-                            <textarea 
-                                placeholder="Type a personal message..."
-                                value={personalMessage}
-                                onChange={(e) => setPersonalMessage(e.target.value)}
-                                className={`w-full p-3 border-2 rounded-2xl font-bold outline-none h-20 resize-none text-sm shadow-inner transition-colors ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-100 text-slate-900 focus:border-indigo-500'}`}
-                            />
-
-                            <div className={`flex justify-between p-1.5 rounded-2xl border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-indigo-50 border-indigo-100'}`}>
-                                {["👋", "🔥", "🤔", "💪", "🏆"].map(e => (
-                                    <button key={e} onClick={() => setSelectedEmoji(e)} className={`text-xl p-2 rounded-xl transition-all ${selectedEmoji === e ? (darkMode ? 'bg-slate-800 shadow-md' : 'bg-white shadow-md') + ' scale-125' : 'opacity-30 hover:opacity-100'}`}>{e}</button>
-                                ))}
-                            </div>
-
-                            <button id="share-btn" onClick={copyToClipboard} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-indigo-600/30">
-                                <Icon name="send" size={18} strokeWidth={2.5} /> SHARE YOUR RESULTS
-                            </button>
+                            <div className={`p-4 rounded-3xl border-2 ${darkMode ? 'border-slate-800 bg-slate-900/80' : 'border-indigo-100 bg-indigo-50/80'}`}><div className="flex justify-between items-center mb-3"><div className="flex items-center gap-1.5 text-orange-500 font-black text-[11px] uppercase tracking-wider"><Icon name="flame" size={14} strokeWidth={3} /> {userStats.currentStreak > 0 ? `${userStats.currentStreak} Day Streak` : 'No Streak'}</div><div className="flex items-center gap-1.5 text-indigo-500 font-black text-[11px] uppercase tracking-wider"><Icon name="shield" size={14} strokeWidth={3} /> {getRankInfo(userStats.totalXP).currentRank.name}</div></div><div className={`w-full rounded-full h-2.5 mb-2 overflow-hidden ${darkMode ? 'bg-slate-950' : 'bg-white'}`}><div className="bg-gradient-to-r from-indigo-500 to-orange-500 h-full rounded-full transition-all duration-1000 ease-out" style={{width: `${barWidth}%`}}></div></div><div className="flex justify-between text-[9px] text-slate-500 font-black tracking-widest uppercase"><span>{userStats.totalXP.toLocaleString()} XP</span><span>{getRankInfo(userStats.totalXP).nextRank.name} ({getRankInfo(userStats.totalXP).nextRank.xp.toLocaleString()})</span></div>{sessionXP > 0 && (<div className="text-center mt-3 text-xs font-black text-emerald-500 animate-pulse bg-emerald-500/10 py-1.5 rounded-lg flex items-center justify-center gap-1"><Icon name="star" size={14} /> +{sessionXP} XP EARNED TODAY!</div>)}{sessionXP === 0 && userStats.lastPlayedDayId === dayDiff && (<div className="text-center mt-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest">XP Already claimed today</div>)}</div>
+                            <div className="grid grid-cols-2 gap-3"><div className={`p-3 rounded-2xl border-2 text-center relative ${darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50'}`}>{isPB && (<div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-amber-300 to-amber-500 text-amber-950 text-[9px] font-black px-3 py-0.5 rounded-full uppercase tracking-widest shadow-md flex items-center gap-1 whitespace-nowrap"><Icon name="crown" size={10} strokeWidth={3} /> NEW PB</div>)}<p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">FINAL TIME</p><p className="text-xl font-black text-orange-500">{formatTime(displaySeconds)}</p></div><div className={`p-3 rounded-2xl border-2 text-center ${darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50'}`}><p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">CHECKS</p><p className="text-xl font-black text-orange-500">{checkCount}</p></div></div>
+                            <textarea placeholder="Type a personal message..." value={personalMessage} onChange={(e) => setPersonalMessage(e.target.value)} className={`w-full p-3 border-2 rounded-2xl font-bold outline-none h-20 resize-none text-sm shadow-inner transition-colors ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-100 text-slate-900 focus:border-indigo-500'}`} />
+                            <div className={`flex justify-between p-1.5 rounded-2xl border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-indigo-50 border-indigo-100'}`}>{["👋", "🔥", "🤔", "💪", "🏆"].map(e => (<button key={e} onClick={() => setSelectedEmoji(e)} className={`text-xl p-2 rounded-xl transition-all ${selectedEmoji === e ? (darkMode ? 'bg-slate-800 shadow-md' : 'bg-white shadow-md') + ' scale-125' : 'opacity-30 hover:opacity-100'}`}>{e}</button>))}</div>
+                            <button id="share-btn" onClick={copyToClipboard} className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-indigo-600/30"><Icon name="send" size={18} strokeWidth={2.5} /> SHARE YOUR RESULTS</button>
                             <button onClick={() => setShowShareModal(false)} className="w-full text-slate-500 font-bold py-1 text-xs uppercase tracking-[0.2em] text-center shrink-0">Back to Grid</button>
                         </div>
                     </div>
@@ -661,7 +533,6 @@
             </div>
           );
         };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
