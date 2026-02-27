@@ -405,8 +405,25 @@
 
               <div className="flex flex-col items-center w-full relative z-10">
                 <div className="relative" style={{ width: GRID_WIDTH * CELL_SIZE + (GRID_WIDTH - 1) * GAP_X }}>
+                    
+                    {/* ENHANCED NEON TRAIL LINE */}
                     <svg className="absolute inset-0 z-0 pointer-events-none overflow-visible w-full h-full">
-                        <path d={svgPathD} fill="transparent" stroke="#F97316" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" className={darkMode ? "opacity-100" : "opacity-60"} />
+                        <defs>
+                            <filter id="trail-glow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
+                        <path 
+                            d={svgPathD} 
+                            fill="transparent" 
+                            stroke="#F97316" 
+                            strokeWidth="6.5" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            filter={darkMode ? "url(#trail-glow)" : "none"}
+                            className={darkMode ? "opacity-100" : "opacity-60"} 
+                        />
                     </svg>
 
                     <div className="relative z-10 flex flex-col w-full h-full" style={{ gap: GAP_Y }}>
